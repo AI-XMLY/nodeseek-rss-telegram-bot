@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -35,13 +36,14 @@ class Database:
     def __init__(self, path: Path) -> None:
         self.path = path
 
-    async def _connect(self) -> aiosqlite.Connection:
-        db = await aiosqlite.connect(self.path)
-        await db.execute("PRAGMA foreign_keys = ON;")
-        return db
+    @asynccontextmanager
+    async def _connect(self):
+        async with aiosqlite.connect(self.path) as db:
+            await db.execute("PRAGMA foreign_keys = ON;")
+            yield db
 
     async def init(self) -> None:
-        async with await self._connect() as db:
+        async with self._connect() as db:
             await db.executescript(
                 """
                 PRAGMA journal_mode=WAL;
@@ -94,7 +96,7 @@ class Database:
         first_name: str | None,
     ) -> UserRecord:
         now = utc_now_iso()
-        async with await self._connect() as db:
+        async with self._connect() as db:
             await db.execute(
                 """
                 INSERT INTO users (tg_user_id, chat_id, username, first_name, created_at, updated_at)
@@ -128,7 +130,7 @@ class Database:
         target_chat_id: int,
     ) -> int:
         now = utc_now_iso()
-        async with await self._connect() as db:
+        async with self._connect() as db:
             cursor = await db.execute(
                 """
                 INSERT INTO subscriptions (
@@ -142,7 +144,7 @@ class Database:
             return int(cursor.lastrowid)
 
     async def list_subscriptions_by_tg_user(self, tg_user_id: int) -> list[SubscriptionRecord]:
-        async with await self._connect() as db:
+        async with self._connect() as db:
             cursor = await db.execute(
                 """
                 SELECT s.id, s.user_id, s.feed_url, s.feed_title, s.keywords, s.match_mode,
@@ -158,7 +160,7 @@ class Database:
         return [SubscriptionRecord(*row) for row in rows]
 
     async def count_subscriptions_by_tg_user(self, tg_user_id: int) -> int:
-        async with await self._connect() as db:
+        async with self._connect() as db:
             cursor = await db.execute(
                 """
                 SELECT COUNT(*)
@@ -172,7 +174,7 @@ class Database:
         return int(row[0]) if row else 0
 
     async def get_all_enabled_subscriptions(self) -> list[SubscriptionRecord]:
-        async with await self._connect() as db:
+        async with self._connect() as db:
             cursor = await db.execute(
                 """
                 SELECT id, user_id, feed_url, feed_title, keywords, match_mode,
@@ -186,7 +188,7 @@ class Database:
         return [SubscriptionRecord(*row) for row in rows]
 
     async def set_subscription_enabled(self, subscription_id: int, tg_user_id: int, enabled: bool) -> bool:
-        async with await self._connect() as db:
+        async with self._connect() as db:
             cursor = await db.execute(
                 """
                 UPDATE subscriptions
@@ -200,7 +202,7 @@ class Database:
             return cursor.rowcount > 0
 
     async def delete_subscription(self, subscription_id: int, tg_user_id: int) -> bool:
-        async with await self._connect() as db:
+        async with self._connect() as db:
             cursor = await db.execute(
                 """
                 DELETE FROM subscriptions
@@ -218,7 +220,7 @@ class Database:
         tg_user_id: int,
         keywords: str,
     ) -> bool:
-        async with await self._connect() as db:
+        async with self._connect() as db:
             cursor = await db.execute(
                 """
                 UPDATE subscriptions
@@ -237,7 +239,7 @@ class Database:
         tg_user_id: int,
         match_mode: str,
     ) -> bool:
-        async with await self._connect() as db:
+        async with self._connect() as db:
             cursor = await db.execute(
                 """
                 UPDATE subscriptions
@@ -256,7 +258,7 @@ class Database:
         tg_user_id: int,
         target_chat_id: int,
     ) -> bool:
-        async with await self._connect() as db:
+        async with self._connect() as db:
             cursor = await db.execute(
                 """
                 UPDATE subscriptions
@@ -270,7 +272,7 @@ class Database:
             return cursor.rowcount > 0
 
     async def update_feed_title(self, subscription_id: int, feed_title: str | None) -> None:
-        async with await self._connect() as db:
+        async with self._connect() as db:
             await db.execute(
                 """
                 UPDATE subscriptions
@@ -282,7 +284,7 @@ class Database:
             await db.commit()
 
     async def is_delivered(self, subscription_id: int, item_key: str) -> bool:
-        async with await self._connect() as db:
+        async with self._connect() as db:
             cursor = await db.execute(
                 """
                 SELECT 1
@@ -295,7 +297,7 @@ class Database:
         return row is not None
 
     async def mark_delivered(self, subscription_id: int, item_key: str) -> None:
-        async with await self._connect() as db:
+        async with self._connect() as db:
             await db.execute(
                 """
                 INSERT OR IGNORE INTO deliveries (subscription_id, item_key, delivered_at)
@@ -306,7 +308,7 @@ class Database:
             await db.commit()
 
     async def set_initialized(self, subscription_id: int) -> None:
-        async with await self._connect() as db:
+        async with self._connect() as db:
             await db.execute(
                 """
                 UPDATE subscriptions
