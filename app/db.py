@@ -157,6 +157,20 @@ class Database:
             rows = await cursor.fetchall()
         return [SubscriptionRecord(*row) for row in rows]
 
+    async def count_subscriptions_by_tg_user(self, tg_user_id: int) -> int:
+        async with await self._connect() as db:
+            cursor = await db.execute(
+                """
+                SELECT COUNT(*)
+                FROM subscriptions s
+                JOIN users u ON u.id = s.user_id
+                WHERE u.tg_user_id = ?
+                """,
+                (tg_user_id,),
+            )
+            row = await cursor.fetchone()
+        return int(row[0]) if row else 0
+
     async def get_all_enabled_subscriptions(self) -> list[SubscriptionRecord]:
         async with await self._connect() as db:
             cursor = await db.execute(
@@ -194,6 +208,63 @@ class Database:
                   AND user_id = (SELECT id FROM users WHERE tg_user_id = ?)
                 """,
                 (subscription_id, tg_user_id),
+            )
+            await db.commit()
+            return cursor.rowcount > 0
+
+    async def update_subscription_keywords(
+        self,
+        subscription_id: int,
+        tg_user_id: int,
+        keywords: str,
+    ) -> bool:
+        async with await self._connect() as db:
+            cursor = await db.execute(
+                """
+                UPDATE subscriptions
+                SET keywords = ?, updated_at = ?
+                WHERE id = ?
+                  AND user_id = (SELECT id FROM users WHERE tg_user_id = ?)
+                """,
+                (keywords, utc_now_iso(), subscription_id, tg_user_id),
+            )
+            await db.commit()
+            return cursor.rowcount > 0
+
+    async def update_subscription_match_mode(
+        self,
+        subscription_id: int,
+        tg_user_id: int,
+        match_mode: str,
+    ) -> bool:
+        async with await self._connect() as db:
+            cursor = await db.execute(
+                """
+                UPDATE subscriptions
+                SET match_mode = ?, updated_at = ?
+                WHERE id = ?
+                  AND user_id = (SELECT id FROM users WHERE tg_user_id = ?)
+                """,
+                (match_mode, utc_now_iso(), subscription_id, tg_user_id),
+            )
+            await db.commit()
+            return cursor.rowcount > 0
+
+    async def update_subscription_target_chat(
+        self,
+        subscription_id: int,
+        tg_user_id: int,
+        target_chat_id: int,
+    ) -> bool:
+        async with await self._connect() as db:
+            cursor = await db.execute(
+                """
+                UPDATE subscriptions
+                SET target_chat_id = ?, updated_at = ?
+                WHERE id = ?
+                  AND user_id = (SELECT id FROM users WHERE tg_user_id = ?)
+                """,
+                (target_chat_id, utc_now_iso(), subscription_id, tg_user_id),
             )
             await db.commit()
             return cursor.rowcount > 0

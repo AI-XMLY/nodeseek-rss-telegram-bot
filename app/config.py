@@ -39,6 +39,7 @@ def _parse_owner_ids(value: str | None) -> tuple[int, ...]:
 class Settings:
     bot_token: str
     database_path: Path
+    max_subscriptions_per_user: int
     poll_interval_seconds: int
     http_timeout_seconds: int
     max_entries_per_feed: int
@@ -67,6 +68,7 @@ class Settings:
         return cls(
             bot_token=bot_token,
             database_path=database_path,
+            max_subscriptions_per_user=int(os.getenv("MAX_SUBSCRIPTIONS_PER_USER", "20")),
             poll_interval_seconds=int(os.getenv("POLL_INTERVAL_SECONDS", "180")),
             http_timeout_seconds=int(os.getenv("HTTP_TIMEOUT_SECONDS", "20")),
             max_entries_per_feed=int(os.getenv("MAX_ENTRIES_PER_FEED", "15")),
@@ -78,4 +80,3 @@ class Settings:
             message_template=message_template,
             bot_owner_ids=_parse_owner_ids(os.getenv("BOT_OWNER_IDS")),
         )
-
