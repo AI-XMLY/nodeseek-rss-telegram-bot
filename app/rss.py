@@ -5,7 +5,8 @@ from dataclasses import dataclass
 import aiohttp
 import feedparser
 
-from app.utils import format_datetime, normalize_keywords, strip_html, truncate_text
+from app.categories import category_label, normalize_category_slug
+from app.utils import format_datetime, strip_html, truncate_text
 
 
 @dataclass(slots=True)
@@ -16,6 +17,8 @@ class FeedEntry:
     summary: str
     published_at: str
     source_text: str
+    category_slug: str | None
+    category_name: str
 
 
 @dataclass(slots=True)
@@ -25,14 +28,13 @@ class FeedFetchResult:
 
 
 class FeedClient:
-    def __init__(self, timeout_seconds: int, max_summary_length: int, max_entries_per_feed: int) -> None:
+    def __init__(self, timeout_seconds: int, max_entries_per_feed: int) -> None:
         self.timeout_seconds = timeout_seconds
-        self.max_summary_length = max_summary_length
         self.max_entries_per_feed = max_entries_per_feed
 
     async def fetch(self, url: str) -> FeedFetchResult:
         timeout = aiohttp.ClientTimeout(total=self.timeout_seconds)
-        headers = {"User-Agent": "NodeSeekRSSBot/1.0 (+https://github.com/)"}
+        headers = {"User-Agent": "NodeSeekKeywordBot/1.0 (+https://github.com/)"}
         async with aiohttp.ClientSession(timeout=timeout, headers=headers) as session:
             async with session.get(url) as response:
                 response.raise_for_status()
@@ -46,7 +48,7 @@ class FeedClient:
             title = strip_html(item.get("title")) or "无标题"
             link = item.get("link", "").strip()
             summary = item.get("summary") or item.get("description") or ""
-            plain_summary = truncate_text(strip_html(summary), self.max_summary_length)
+            plain_summary = truncate_text(strip_html(summary), 280)
             published_raw = (
                 item.get("published")
                 or item.get("updated")
@@ -60,35 +62,38 @@ class FeedClient:
                 or link
                 or f"{title}:{published_raw}"
             )
+
             tags = item.get("tags") or []
-            tag_text = " ".join(
+            tag_terms = [
                 strip_html(tag.get("term", ""))
                 for tag in tags
                 if isinstance(tag, dict) and tag.get("term")
-            )
+            ]
+            category_slug = None
+            for term in tag_terms:
+                category_slug = normalize_category_slug(term)
+                if category_slug:
+                    break
+
             source_text = " ".join(
-                part for part in [title, plain_summary, tag_text] if part
+                part for part in [title, plain_summary, " ".join(tag_terms)] if part
             ).lower()
             entries.append(
                 FeedEntry(
                     item_key=item_key,
                     title=title,
                     link=link,
-                    summary=plain_summary or "这条 RSS 没有摘要，可直接点开原帖查看。",
+                    summary=plain_summary,
                     published_at=format_datetime(published_raw),
                     source_text=source_text,
+                    category_slug=category_slug,
+                    category_name=category_label(category_slug),
                 )
             )
 
         return FeedFetchResult(feed_title=feed_title, entries=entries)
 
 
-def match_keywords(source_text: str, raw_keywords: str, match_mode: str) -> tuple[bool, list[str]]:
-    keywords = normalize_keywords(raw_keywords)
-    if not keywords:
-        return True, []
-
-    matched = [keyword for keyword in keywords if keyword in source_text]
-    if match_mode == "all":
-        return len(matched) == len(keywords), matched
-    return len(matched) > 0, matched
+def match_keywords(source_text: str, keywords: list[str]) -> list[str]:
+    lowered = source_text.lower()
+    return [keyword for keyword in keywords if keyword.lower() in lowered]
