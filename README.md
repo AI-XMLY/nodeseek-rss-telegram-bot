@@ -11,22 +11,107 @@
 - 去重推送，重启后状态不丢失
 - 多用户共享
 
-## 常用命令
+## 用户新手教程
+
+如果你只是想用这个 Bot，不需要会 VPS，也不需要会 Docker。
+
+1. 在 Telegram 里找到 Bot，先发送：
+
+```text
+/start
+```
+
+2. 添加你关心的关键词：
+
+```text
+/keywords oracle,免费鸡,甲骨文
+```
+
+3. 如果你只想看某些版块，发送：
+
+```text
+/scope
+```
+
+然后按按钮选择版块。
+
+4. 查看当前设置：
+
+```text
+/status
+```
+
+5. 查看最近命中的帖子：
+
+```text
+/history
+```
+
+常用命令：
 
 - `/keywords`：查看我的关键词
 - `/keywords <词1,词2>`：添加一个或多个关键词
 - `/on <关键词ID>`：开启关键词
 - `/off <关键词ID>`：关闭关键词
 - `/delkw <关键词ID>`：删除关键词
-- `/scope`：设置监控版块
-- `/targets`：查看推送目标
 - `/addtarget`：把当前聊天加入推送目标
+- `/targets`：查看推送目标
 - `/deltarget <目标ID>`：删除推送目标
 - `/history`：查看最近命中的帖子
 - `/status`：查看当前配置
 - `/pause`：暂停提醒
 - `/resume`：恢复提醒
-- `/chatid`：查看当前聊天 ID
+
+## 开发者新手教程
+
+如果你想自己部署一个 Bot 给自己或别人用，按下面做就行。
+
+1. 准备一台 VPS，并安装 Docker 和 Git：
+
+```bash
+apt update
+apt install -y docker.io docker-compose-plugin git
+```
+
+2. 去 Telegram 找 `@BotFather` 创建 Bot，拿到 `BOT_TOKEN`
+
+3. 在 VPS 上下载项目：
+
+```bash
+git clone https://github.com/<your-username>/nodeseek-rss-telegram-bot.git
+cd nodeseek-rss-telegram-bot
+```
+
+4. 创建配置文件：
+
+```bash
+cp .env.example .env
+nano .env
+```
+
+把 `BOT_TOKEN` 改成你自己的。
+
+5. 启动 Bot：
+
+```bash
+docker compose up -d --build
+```
+
+6. 查看是否成功：
+
+```bash
+docker compose logs -f
+```
+
+看到 `Application started` 就说明启动成功了。
+
+7. 以后更新项目：
+
+```bash
+git pull
+docker compose down
+docker compose up -d --build
+```
 
 ## 隐私说明
 
