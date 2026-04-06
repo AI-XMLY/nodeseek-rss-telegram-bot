@@ -26,6 +26,12 @@ Common commands:
 - `/pause`: pause notifications
 - `/resume`: resume notifications
 
+Notes:
+
+- Private chats work by default, and you do not need to run `/addtarget` manually
+- In groups or channels, only admins can use `/addtarget`
+- If `ALLOWED_USER_IDS` is enabled, only allowlisted users can use the bot
+
 ## You Can Try My Bot First
 
 [https://t.me/<your-bot>](https://t.me/<your-bot>)
@@ -56,6 +62,12 @@ nano .env
 ```
 
 Replace `BOT_TOKEN` with your own token.
+
+If you want allowlist mode, you can also add:
+
+```text
+ALLOWED_USER_IDS=123456789,987654321
+```
 
 5. Start the bot:
 

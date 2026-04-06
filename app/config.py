@@ -13,7 +13,7 @@ def _parse_bool(value: str | None, default: bool) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
-def _parse_owner_ids(value: str | None) -> tuple[int, ...]:
+def _parse_id_list(value: str | None) -> tuple[int, ...]:
     if not value:
         return tuple()
     result = []
@@ -39,7 +39,7 @@ class Settings:
     mark_as_read_on_first_poll: bool
     disable_web_page_preview: bool
     log_level: str
-    bot_owner_ids: tuple[int, ...]
+    allowed_user_ids: tuple[int, ...]
 
     @classmethod
     def load(cls) -> "Settings":
@@ -70,5 +70,7 @@ class Settings:
             mark_as_read_on_first_poll=_parse_bool(os.getenv("MARK_AS_READ_ON_FIRST_POLL"), True),
             disable_web_page_preview=_parse_bool(os.getenv("DISABLE_WEB_PAGE_PREVIEW"), False),
             log_level=os.getenv("LOG_LEVEL", "INFO").upper(),
-            bot_owner_ids=_parse_owner_ids(os.getenv("BOT_OWNER_IDS")),
+            allowed_user_ids=_parse_id_list(
+                os.getenv("ALLOWED_USER_IDS", os.getenv("BOT_OWNER_IDS"))
+            ),
         )
