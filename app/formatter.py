@@ -39,8 +39,10 @@ class MessageFormatter:
         highlighted_title = _highlight_title(title, matched_keywords)
         keywords_text = escape_html(",".join(matched_keywords) if matched_keywords else "未命中")
         category_text = escape_html(category_name)
+        link_text = escape_html(link)
         return (
             f"<b>{highlighted_title}</b>\n"
             f"⚡️⚡️⚡️关键词：<code>{keywords_text}</code>\n"
-            f"🏷️🏷️🏷️板块：<code>{category_text}</code>"
+            f"🏷️🏷️🏷️板块：<code>{category_text}</code>\n"
+            f"{link_text}"
         ).strip()
