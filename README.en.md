@@ -11,42 +11,6 @@ Monitor NodeSeek keywords and push matched new posts to Telegram. Supports multi
 - Deduplicated notifications with persisted state
 - Multi-user shared deployment
 
-## User Beginner Guide
-
-If you only want to use the bot, you do not need to know VPS or Docker.
-
-1. Open the bot in Telegram and send:
-
-```text
-/start
-```
-
-2. Add the keywords you want to monitor:
-
-```text
-/keywords oracle,免费鸡,甲骨文
-```
-
-3. If you only want some categories, send:
-
-```text
-/scope
-```
-
-Then choose categories with the buttons.
-
-4. Check your current settings:
-
-```text
-/status
-```
-
-5. Check recent matched posts:
-
-```text
-/history
-```
-
 Common commands:
 
 - `/keywords`: show your keywords
@@ -62,11 +26,13 @@ Common commands:
 - `/pause`: pause notifications
 - `/resume`: resume notifications
 
-## Developer Beginner Guide
+## Try My Bot First
 
-If you want to deploy your own bot for yourself or others, just follow these steps.
+[https://t.me/<your-bot>](https://t.me/<your-bot>)
 
-1. Prepare a VPS and install Docker and Git:
+## Personal Deployment Guide
+
+1. Install Docker and Git on your VPS:
 
 ```bash
 apt update
@@ -105,7 +71,7 @@ docker compose logs -f
 
 If you see `Application started`, the bot is running.
 
-7. Update the project later with:
+7. Update the project:
 
 ```bash
 git pull
