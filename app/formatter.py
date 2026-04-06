@@ -42,6 +42,6 @@ class MessageFormatter:
         link_text = escape_html(link)
         return (
             f'<a href="{link_text}"><b>{highlighted_title}</b></a>\n'
-            f"⚡️⚡️⚡️ 关键词： <u>{keywords_text}</u>\n"
-            f"🏷️🏷️🏷️ 板  块： <u>{category_text}</u>"
+            f"⚡️⚡️⚡️ 关键词： {keywords_text}\n"
+            f"🏷️🏷️🏷️ 板   块： <u>{category_text}</u>"
         ).strip()
