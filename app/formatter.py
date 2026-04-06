@@ -21,7 +21,7 @@ def _highlight_title(title: str, matched_keywords: list[str]) -> str:
         if start < last_end:
             continue
         parts.append(escape_html(title[last_end:start]))
-        parts.append(f"<u>{escape_html(title[start:end])}</u>")
+        parts.append(f"{escape_html(title[start:end])}")
         last_end = end
     parts.append(escape_html(title[last_end:]))
     return "".join(parts)
@@ -37,12 +37,12 @@ class MessageFormatter:
         category_name: str,
     ) -> str:
         highlighted_title = _highlight_title(title, matched_keywords)
-        keywords_text = escape_html(",".join(matched_keywords) if matched_keywords else "未命中")
+        keywords_text = escape_html("  ".join(matched_keywords) if matched_keywords else "未命中")
         category_text = escape_html(category_name)
         link_text = escape_html(link)
         return (
-            f"<b>{highlighted_title}</b>\n"
-            f"⚡️⚡️⚡️关键词：<code>{keywords_text}</code>\n"
-            f"🏷️🏷️🏷️板块：<code>{category_text}</code>\n"
+            f"<b>{highlighted_title}</b>\n\n"
+            f"⚡️⚡️⚡️ 关键词： <u>{keywords_text}</u>\n\n"
+            f"🏷️🏷️🏷️ 板块 <u>{category_text}</u>\n\n"
             f"{link_text}"
         ).strip()
