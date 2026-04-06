@@ -6,7 +6,7 @@ Monitor NodeSeek keywords and push matched new posts to Telegram. Supports multi
 
 - Per-keyword add / enable / disable / delete
 - Multi-select category filtering
-- Multiple delivery targets per user, up to 10 targets
+- Multiple delivery targets, up to 10 in total across user chats and communities
 - Delivery history
 - Deduplicated notifications with persisted state
 - Multi-user shared deployment
@@ -26,7 +26,7 @@ Common commands:
 - `/pause`: pause notifications
 - `/resume`: resume notifications
 
-## Try My Bot First
+## You Can Try My Bot First
 
 [https://t.me/<your-bot>](https://t.me/<your-bot>)
 
