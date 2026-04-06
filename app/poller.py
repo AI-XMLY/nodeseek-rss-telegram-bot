@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from telegram import Bot
+from telegram import Bot, LinkPreviewOptions
 
 from app.config import Settings
 from app.db import Database, PollingUserRecord
@@ -109,7 +109,10 @@ class FeedPoller:
                         chat_id=target.chat_id,
                         text=message,
                         parse_mode="HTML",
-                        disable_web_page_preview=self.settings.disable_web_page_preview,
+                        link_preview_options=LinkPreviewOptions(
+                            is_disabled=self.settings.disable_web_page_preview,
+                            url=entry.link or None,
+                        ),
                     )
                     delivered = True
                 except Exception:
