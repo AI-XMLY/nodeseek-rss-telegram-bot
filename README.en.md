@@ -32,6 +32,10 @@ Notes:
 - In groups or channels, only admins can use `/addtarget`
 - If `ALLOWED_USER_IDS` is enabled, only allowlisted users can use the bot
 
+## Try My Bot First
+
+[https://t.me/NodeSeekKey_bot](https://t.me/NodeSeekKey_bot)
+
 ## Personal Deployment Guide
 
 1. Install Docker and Git on your VPS:

@@ -32,6 +32,10 @@
 - 群组或频道里只有管理员才能执行 `/addtarget`
 - 如启用 `ALLOWED_USER_IDS`，只有白名单用户可以使用 Bot
 
+## 可以先订阅我的机器人试试
+
+https://t.me/NodeSeekKey_bot
+
 
 ## 个人部署教程
 
