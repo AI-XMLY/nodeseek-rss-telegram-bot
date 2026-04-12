@@ -32,10 +32,6 @@ Notes:
 - In groups or channels, only admins can use `/addtarget`
 - If `ALLOWED_USER_IDS` is enabled, only allowlisted users can use the bot
 
-## You Can Try My Bot First
-
-[https://t.me/<your-bot>](https://t.me/<your-bot>)
-
 ## Personal Deployment Guide
 
 1. Install Docker and Git on your VPS:
@@ -66,7 +62,7 @@ Replace `BOT_TOKEN` with your own token.
 If you want allowlist mode, you can also add:
 
 ```text
-ALLOWED_USER_IDS=123456789,987654321
+ALLOWED_USER_IDS=<user_id_1>,<user_id_2>
 ```
 
 5. Start the bot:

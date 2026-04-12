@@ -33,11 +33,6 @@
 - 如启用 `ALLOWED_USER_IDS`，只有白名单用户可以使用 Bot
 
 
-## 可以先订阅我的机器人试试
-
-https://t.me/<your-bot>
-
-
 ## 个人部署教程
 
 1. VPS安装 Docker 和 Git：
@@ -52,7 +47,7 @@ apt install -y docker.io docker-compose-plugin git
 3. 在 VPS 上下载项目：
 
 ```bash
-git clone https://github.com/<your-username>/nodeseek-rss-telegram-bot.git
+git clone https://github.com/<你的用户名>/nodeseek-rss-telegram-bot.git
 cd nodeseek-rss-telegram-bot
 ```
 
@@ -68,7 +63,7 @@ nano .env
 如需启用白名单模式，可以额外配置：
 
 ```text
-ALLOWED_USER_IDS=123456789,987654321
+ALLOWED_USER_IDS=<用户ID1>,<用户ID2>
 ```
 
 5. 启动 Bot：
