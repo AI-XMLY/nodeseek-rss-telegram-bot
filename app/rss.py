@@ -97,3 +97,21 @@ class FeedClient:
 def match_keywords(source_text: str, keywords: list[str]) -> list[str]:
     lowered = source_text.lower()
     return [keyword for keyword in keywords if keyword.lower() in lowered]
+
+
+def _required_terms(record) -> list[str]:
+    stored_terms = (
+        getattr(record, "required_keywords", "")
+        or getattr(record, "normalized_keyword", "")
+    )
+    return [term.strip().lower() for term in stored_terms.split(",") if term.strip()]
+
+
+def match_keyword_rules(source_text: str, keyword_records: list) -> list:
+    lowered = source_text.lower()
+    matched = []
+    for record in keyword_records:
+        terms = _required_terms(record)
+        if terms and all(term in lowered for term in terms):
+            matched.append(record)
+    return matched

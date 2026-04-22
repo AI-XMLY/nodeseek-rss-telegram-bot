@@ -64,7 +64,7 @@ class Settings:
             ),
             max_targets_per_user=int(os.getenv("MAX_TARGETS_PER_USER", "10")),
             history_limit=int(os.getenv("HISTORY_LIMIT", "10")),
-            poll_interval_seconds=int(os.getenv("POLL_INTERVAL_SECONDS", "180")),
+            poll_interval_seconds=int(os.getenv("POLL_INTERVAL_SECONDS", "10")),
             http_timeout_seconds=int(os.getenv("HTTP_TIMEOUT_SECONDS", "20")),
             max_entries_per_feed=int(os.getenv("MAX_ENTRIES_PER_FEED", "30")),
             mark_as_read_on_first_poll=_parse_bool(os.getenv("MARK_AS_READ_ON_FIRST_POLL"), True),

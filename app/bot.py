@@ -29,9 +29,13 @@ HELP_TEXT = """
 /keywords - 查看我的关键词
 /keywords <关键词1,关键词2> - 一次添加一个或多个关键词
 /addkw <关键词> - 添加单个关键词
+/combo <关键词1,关键词2> - 添加组合规则，所有词都命中才提醒
 /on <关键词ID> - 开启一个关键词
 /off <关键词ID> - 关闭一个关键词
 /delkw <关键词ID> - 删除一个关键词
+/block <屏蔽词1,屏蔽词2> - 添加屏蔽词，命中后不推送
+/blocks - 查看我的屏蔽词
+/delblock <屏蔽词ID> - 删除一个屏蔽词
 /scope - 通过按钮选择监控版块（支持多选）
 /scope all - 监控全部版块
 /scope <slug1,slug2> - 用 slug 设置版块，例如：/scope trade,inner
@@ -49,7 +53,7 @@ HELP_TEXT = """
 daily, tech, info, review, trade, carpool, promo, life, dev, photo-share, expose, inner, sandbox
 
 说明：
-1. 每个关键词都独立管理，命中任意一个已启用关键词就会提醒。
+1. 普通关键词命中任意一个就提醒，组合规则需要所有词同时命中。
 2. 默认第一次使用会跳过旧帖，只从后续新帖开始通知。
 3. 默认会把你第一次对话的当前聊天加入推送目标。
 4. 每个用户最多可配置多个推送目标，默认上限是 10 个。
@@ -68,6 +72,29 @@ def _split_keywords(payload: str) -> list[str]:
         seen.add(normalized)
         result.append(keyword)
     return result
+
+
+def _split_combo_terms(payload: str) -> list[str]:
+    if "," in payload:
+        parts = payload.split(",")
+    else:
+        parts = payload.split(" + ")
+
+    result: list[str] = []
+    seen: set[str] = set()
+    for part in parts:
+        keyword = part.strip()
+        normalized = keyword.lower()
+        if not keyword or normalized in seen:
+            continue
+        seen.add(normalized)
+        result.append(keyword)
+    return result
+
+
+def _keyword_kind(required_keywords: str) -> str:
+    terms = [item.strip() for item in required_keywords.split(",") if item.strip()]
+    return "组合" if len(terms) > 1 else "关键词"
 
 
 def _chat_display_name(chat_title: str | None, chat_type: str | None, chat_id: int) -> str:
@@ -191,10 +218,11 @@ class BotHandlers:
             return
 
         lines = ["我的关键词："]
-        for keyword in keywords:
+        for index, keyword in enumerate(keywords, start=1):
             status = "开启" if keyword.enabled else "关闭"
+            kind = _keyword_kind(keyword.required_keywords)
             lines.append(
-                f"{keyword.id}. {keyword.keyword} [{status}] 命中 {keyword.hit_count} 次"
+                f"{index}. {keyword.keyword}（ID: {keyword.id}，{kind}）[{status}] 命中 {keyword.hit_count} 次"
             )
         await update.effective_message.reply_text("\n".join(lines))
 
@@ -242,6 +270,104 @@ class BotHandlers:
             return
 
         await update.effective_message.reply_text("这些关键词都已经存在了，无需重复添加。")
+
+    async def combo(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if await self.ensure_user(update) is None:
+            return
+        if not update.effective_message or not update.effective_user:
+            return
+        payload = update.effective_message.text.partition(" ")[2].strip()
+        terms = _split_combo_terms(payload)
+        if len(terms) < 2:
+            await update.effective_message.reply_text(
+                "请至少输入 2 个关键词。\n例如：/combo dmit,corona"
+            )
+            return
+
+        current_count = await self.db.count_keywords_by_tg_user(update.effective_user.id)
+        if current_count >= self.settings.max_keywords_per_user:
+            await update.effective_message.reply_text(
+                "你已经达到关键词数量上限。\n"
+                f"当前上限：{self.settings.max_keywords_per_user} 个"
+            )
+            return
+
+        display = " + ".join(terms)
+        success, record = await self.db.add_keyword(
+            update.effective_user.id,
+            display,
+            required_terms=terms,
+        )
+        if not success or record is None:
+            await update.effective_message.reply_text("这条组合规则已经存在了，无需重复添加。")
+            return
+        await update.effective_message.reply_text(
+            f"已添加组合规则：{record.keyword}\n"
+            "以后需要这些词同时出现在帖子里才会提醒。"
+        )
+
+    async def block(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if await self.ensure_user(update) is None:
+            return
+        if not update.effective_message or not update.effective_user:
+            return
+        payload = update.effective_message.text.partition(" ")[2].strip()
+        keywords = _split_keywords(payload)
+        if not keywords:
+            await update.effective_message.reply_text(
+                "请用：/block <屏蔽词1,屏蔽词2>\n例如：/block 求购,收"
+            )
+            return
+
+        added: list[str] = []
+        duplicates: list[str] = []
+        for keyword in keywords:
+            success, record = await self.db.add_block_keyword(update.effective_user.id, keyword)
+            if not success or record is None:
+                duplicates.append(keyword)
+                continue
+            added.append(record.keyword)
+
+        if added:
+            text = "已添加屏蔽词：\n" + "\n".join(f"- {item}" for item in added)
+            if duplicates:
+                text += "\n\n以下屏蔽词已存在，已跳过：\n" + "\n".join(
+                    f"- {item}" for item in duplicates
+                )
+            await update.effective_message.reply_text(text)
+            return
+
+        await update.effective_message.reply_text("这些屏蔽词都已经存在了，无需重复添加。")
+
+    async def blocks(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if await self.ensure_user(update) is None:
+            return
+        if not update.effective_message or not update.effective_user:
+            return
+        blocks = await self.db.list_block_keywords_by_tg_user(update.effective_user.id)
+        if not blocks:
+            await update.effective_message.reply_text(
+                "你还没有屏蔽词。\n可以直接发：/block 求购,收"
+            )
+            return
+        lines = ["我的屏蔽词："]
+        for index, keyword in enumerate(blocks, start=1):
+            lines.append(
+                f"{index}. {keyword.keyword}（ID: {keyword.id}）命中 {keyword.hit_count} 次"
+            )
+        await update.effective_message.reply_text("\n".join(lines))
+
+    async def delblock(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if await self.ensure_user(update) is None:
+            return
+        if not update.effective_message or not update.effective_user:
+            return
+        payload = update.effective_message.text.partition(" ")[2].strip()
+        if not payload or not payload.isdigit():
+            await update.effective_message.reply_text("请用：/delblock <屏蔽词ID>")
+            return
+        deleted = await self.db.delete_block_keyword(update.effective_user.id, int(payload))
+        await update.effective_message.reply_text("已删除。" if deleted else "没有找到这个屏蔽词 ID。")
 
     async def set_keyword_state(
         self,
@@ -487,9 +613,13 @@ class BotHandlers:
             return
         settings = await self.db.get_user_settings_by_tg_user(update.effective_user.id)
         keywords = await self.db.list_keywords_by_tg_user(update.effective_user.id)
+        block_keywords = await self.db.list_block_keywords_by_tg_user(update.effective_user.id)
         targets = await self.db.list_targets_by_tg_user(update.effective_user.id)
 
         active_keywords = sum(1 for item in keywords if item.enabled)
+        combo_count = sum(
+            1 for item in keywords if _keyword_kind(item.required_keywords) == "组合"
+        )
         category_text = "全部版块"
         if settings and settings.category_slugs:
             selected = [slug for slug in CATEGORY_ORDER if slug in settings.category_slugs.split(",")]
@@ -498,7 +628,8 @@ class BotHandlers:
         lines = [
             "当前配置：",
             f"状态：{'启用' if settings and settings.enabled else '暂停'}",
-            f"关键词：{len(keywords)} 个（启用 {active_keywords} 个）",
+            f"关键词规则：{len(keywords)} 条（启用 {active_keywords} 条，组合 {combo_count} 条）",
+            f"屏蔽词：{len(block_keywords)} 个",
             f"版块：{category_text}",
             f"推送目标：{len(targets)} 个",
         ]
@@ -565,9 +696,13 @@ def build_application(settings: Settings, db: Database) -> Application:
     application.add_handler(CommandHandler("chatid", handlers.chatid))
     application.add_handler(CommandHandler("keywords", handlers.keywords))
     application.add_handler(CommandHandler("addkw", handlers.addkw))
+    application.add_handler(CommandHandler("combo", handlers.combo))
     application.add_handler(CommandHandler("on", handlers.on))
     application.add_handler(CommandHandler("off", handlers.off))
     application.add_handler(CommandHandler("delkw", handlers.delkw))
+    application.add_handler(CommandHandler("block", handlers.block))
+    application.add_handler(CommandHandler("blocks", handlers.blocks))
+    application.add_handler(CommandHandler("delblock", handlers.delblock))
     application.add_handler(CommandHandler("scope", handlers.scope))
     application.add_handler(CommandHandler("targets", handlers.targets))
     application.add_handler(CommandHandler("addtarget", handlers.addtarget))

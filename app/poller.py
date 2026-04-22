@@ -4,11 +4,12 @@ import asyncio
 import logging
 
 from telegram import Bot, LinkPreviewOptions
+from telegram.error import Forbidden
 
 from app.config import Settings
 from app.db import Database, PollingUserRecord
 from app.formatter import MessageFormatter
-from app.rss import FeedClient, match_keywords
+from app.rss import FeedClient, match_keyword_rules, match_keywords
 
 logger = logging.getLogger(__name__)
 
@@ -57,13 +58,19 @@ class FeedPoller:
             return
 
         entries = list(reversed(result.entries))
-        for user_record in users:
-            await self._handle_user(bot, user_record, entries)
+        semaphore = asyncio.Semaphore(8)
+
+        async def handle_with_limit(user_record: PollingUserRecord) -> None:
+            async with semaphore:
+                await self._handle_user(bot, user_record, entries)
+
+        await asyncio.gather(*(handle_with_limit(user_record) for user_record in users))
 
     async def _handle_user(self, bot: Bot, user_record: PollingUserRecord, entries) -> None:
-        enabled_keywords = [item.keyword for item in user_record.keywords if item.enabled]
+        enabled_keywords = [item for item in user_record.keywords if item.enabled]
         if not enabled_keywords:
             return
+        block_keywords = [item.keyword for item in user_record.block_keywords]
 
         category_filter = {
             slug.strip()
@@ -80,10 +87,13 @@ class FeedPoller:
                     link=entry.link,
                     category_slug=entry.category_slug,
                     matched_keywords=[],
+                    delivery_status="read",
                 )
             await self.db.set_user_initialized(user_record.user.id)
             logger.info("User %s initialized without backfill", user_record.user.tg_user_id)
             return
+
+        disabled_target_ids: set[int] = set()
 
         for entry in entries:
             if category_filter and entry.category_slug not in category_filter:
@@ -91,9 +101,28 @@ class FeedPoller:
             if await self.db.is_delivered(user_record.user.id, entry.item_key):
                 continue
 
-            matched_keywords = match_keywords(entry.source_text, enabled_keywords)
-            if not matched_keywords:
+            matched_blocks = match_keywords(entry.source_text, block_keywords)
+            if matched_blocks:
+                await self.db.mark_delivered(
+                    user_record.user.id,
+                    entry.item_key,
+                    title=entry.title,
+                    link=entry.link,
+                    category_slug=entry.category_slug,
+                    matched_keywords=matched_blocks,
+                    delivery_status="blocked",
+                )
+                await self.db.bump_block_keyword_hits(
+                    user_record.user.id,
+                    [keyword.lower() for keyword in matched_blocks],
+                )
                 continue
+
+            matched_rules = match_keyword_rules(entry.source_text, enabled_keywords)
+            if not matched_rules:
+                continue
+            matched_keywords = [rule.keyword for rule in matched_rules]
+            matched_keyword_keys = [rule.normalized_keyword for rule in matched_rules]
 
             message = self.formatter.render(
                 title=entry.title,
@@ -104,6 +133,8 @@ class FeedPoller:
 
             delivered = False
             for target in user_record.targets:
+                if target.id in disabled_target_ids:
+                    continue
                 try:
                     await bot.send_message(
                         chat_id=target.chat_id,
@@ -115,6 +146,15 @@ class FeedPoller:
                         ),
                     )
                     delivered = True
+                except Forbidden as error:
+                    disabled_target_ids.add(target.id)
+                    await self.db.set_target_enabled(user_record.user.id, target.id, False)
+                    logger.warning(
+                        "Disabled target %s for user %s: %s",
+                        target.id,
+                        user_record.user.tg_user_id,
+                        error.message,
+                    )
                 except Exception:
                     logger.exception(
                         "Failed to send item %s to user %s target %s",
@@ -132,7 +172,7 @@ class FeedPoller:
                     category_slug=entry.category_slug,
                     matched_keywords=matched_keywords,
                 )
-                await self.db.bump_keyword_hits(user_record.user.id, matched_keywords)
+                await self.db.bump_keyword_hits(user_record.user.id, matched_keyword_keys)
 
         if not user_record.settings.initialized:
             await self.db.set_user_initialized(user_record.user.id)

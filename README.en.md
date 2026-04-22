@@ -1,23 +1,30 @@
 # NodeSeek Keyword Monitor Bot
 
-Monitor NodeSeek keywords and push matched new posts to Telegram. Supports multi-user shared deployment, keyword toggles, multi-category filtering, delivery history, and deduplicated notifications.
+Monitor NodeSeek keywords and push matched new posts to Telegram. Supports multi-user shared deployment, keyword combinations, block keywords, multi-category filtering, delivery history, and deduplicated notifications.
 
 ## Features
 
 - Per-keyword add / enable / disable / delete
+- Keyword combinations, for example `dmit + corona` only matches when all terms appear
+- Block keywords, so matched blocked terms suppress notifications
 - Multi-select category filtering
 - Multiple delivery targets, up to 10 in total across user chats and communities
 - Delivery history
 - Deduplicated notifications with persisted state
 - Multi-user shared deployment
+- Polls RSS every 10 seconds by default, configurable in `.env`
 
 Common commands:
 
 - `/keywords`: show your keywords
 - `/keywords <kw1,kw2>`: add one or more keywords
+- `/combo <kw1,kw2>`: add a keyword combination that requires all terms
 - `/on <keyword_id>`: enable a keyword
 - `/off <keyword_id>`: disable a keyword
 - `/delkw <keyword_id>`: delete a keyword
+- `/block <kw1,kw2>`: add block keywords
+- `/blocks`: show block keywords
+- `/delblock <block_keyword_id>`: delete a block keyword
 - `/addtarget`: add the current chat as a target
 - `/targets`: show delivery targets
 - `/deltarget <target_id>`: remove a target
