@@ -69,9 +69,9 @@ cp .env.example .env
 nano .env
 ```
 
-把 `BOT_TOKEN` 改成你自己的。
+  把 `BOT_TOKEN` 改成你自己的。
 
-如需启用白名单模式，可以额外配置：
+  如需启用白名单模式，可以额外配置：
 
 ```text
 ALLOWED_USER_IDS=<用户ID1>,<用户ID2>
@@ -89,7 +89,7 @@ docker compose up -d --build
 docker compose logs -f
 ```
 
-看到 `Application started` 就说明启动成功了。
+  看到 `Application started` 就说明启动成功了。
 
 7. 更新项目：
 
