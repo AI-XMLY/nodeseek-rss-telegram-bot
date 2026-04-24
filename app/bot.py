@@ -40,7 +40,7 @@ HELP_TEXT = """
 /scope all - 监控全部版块
 /scope <slug1,slug2> - 用 slug 设置版块，例如：/scope trade,inner
 /targets - 查看当前推送目标
-/addtarget - 将当前聊天加入推送目标（群组/频道要求管理员）
+/addtarget - 将当前聊天加入推送目标；私聊里也可用 /addtarget <chat_id> 绑定群组或频道
 /target <chat_id> - 已停用，请改用 /addtarget
 /deltarget <目标ID> - 删除一个推送目标
 /history - 查看最近命中的帖子
@@ -136,6 +136,90 @@ class BotHandlers:
             "当前聊天是群组或频道，只有管理员才能把这里加入推送目标。"
         )
         return False
+
+    async def _resolve_target_chat(
+        self,
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE,
+        requested_chat_id: int | None,
+    ) -> tuple[int, str | None, str] | None:
+        if not update.effective_message or not update.effective_chat:
+            return None
+
+        if requested_chat_id is None:
+            if not await self._ensure_chat_admin(update, context):
+                return None
+
+            chat = update.effective_chat
+            if chat.type == "private":
+                chat_title = update.effective_user.full_name if update.effective_user else "私聊"
+            else:
+                chat_title = chat.title
+            return chat.id, chat_title, chat.type
+
+        if not update.effective_user:
+            await update.effective_message.reply_text(
+                "私聊绑定频道或群组时，需要由你的个人账号来操作。"
+            )
+            return None
+
+        try:
+            target_chat = await context.bot.get_chat(requested_chat_id)
+        except Exception:
+            await update.effective_message.reply_text(
+                "无法访问这个目标 chat_id。\n"
+                "请确认 chat_id 正确，并且 Bot 已经加入对应的群组或频道。"
+            )
+            return None
+
+        try:
+            requester_member = await context.bot.get_chat_member(
+                chat_id=requested_chat_id,
+                user_id=update.effective_user.id,
+            )
+        except Exception:
+            await update.effective_message.reply_text(
+                "暂时无法校验你在目标群组或频道里的管理员身份。"
+            )
+            return None
+
+        if getattr(requester_member, "status", "") not in {"administrator", "creator", "owner"}:
+            await update.effective_message.reply_text(
+                "你不是这个群组或频道的管理员，不能把它加入推送目标。"
+            )
+            return None
+
+        try:
+            me = await context.bot.get_me()
+            bot_member = await context.bot.get_chat_member(
+                chat_id=requested_chat_id,
+                user_id=me.id,
+            )
+        except Exception:
+            await update.effective_message.reply_text(
+                "Bot 还没有加入这个群组或频道，或当前权限不足。"
+            )
+            return None
+
+        bot_status = getattr(bot_member, "status", "")
+        if target_chat.type == "channel":
+            allowed_statuses = {"administrator", "creator", "owner"}
+            if bot_status not in allowed_statuses:
+                await update.effective_message.reply_text(
+                    "频道场景下，请先把 Bot 加为频道管理员，然后再执行：\n"
+                    f"/addtarget {requested_chat_id}"
+                )
+                return None
+        else:
+            allowed_statuses = {"administrator", "creator", "owner", "member"}
+            if bot_status not in allowed_statuses:
+                await update.effective_message.reply_text(
+                    "Bot 还没有加入这个群组，或当前权限不足。"
+                )
+                return None
+
+        chat_title = getattr(target_chat, "title", None) or getattr(target_chat, "full_name", None)
+        return requested_chat_id, chat_title, target_chat.type
 
     async def ensure_user(self, update: Update) -> UserRecord | None:
         if not update.effective_user or not update.effective_chat:
@@ -523,12 +607,25 @@ class BotHandlers:
         user = await self.ensure_user(update)
         if user is None or not update.effective_message or not update.effective_chat:
             return
-        if not await self._ensure_chat_admin(update, context):
+        payload = update.effective_message.text.partition(" ")[2].strip()
+        requested_chat_id: int | None = None
+        if payload:
+            if not payload.lstrip("-").isdigit():
+                await update.effective_message.reply_text(
+                    "请用：/addtarget 或 /addtarget <chat_id>"
+                )
+                return
+            requested_chat_id = int(payload)
+
+        target_chat = await self._resolve_target_chat(update, context, requested_chat_id)
+        if target_chat is None:
             return
 
+        target_chat_id, chat_title, chat_type = target_chat
+
         existing_targets = await self.db.list_targets_by_tg_user(user.tg_user_id)
-        if any(item.chat_id == update.effective_chat.id for item in existing_targets):
-            await update.effective_message.reply_text("当前聊天已经在推送目标列表里了。")
+        if any(item.chat_id == target_chat_id for item in existing_targets):
+            await update.effective_message.reply_text("这个目标已经在推送目标列表里了。")
             return
 
         current_count = await self.db.count_targets_by_tg_user(user.tg_user_id)
@@ -539,30 +636,25 @@ class BotHandlers:
             )
             return
 
-        chat = update.effective_chat
-        if chat.type == "private":
-            chat_title = update.effective_user.full_name if update.effective_user else "私聊"
-        else:
-            chat_title = chat.title
         created = await self.db.add_target_by_tg_user(
             user.tg_user_id,
-            chat.id,
+            target_chat_id,
             chat_title=chat_title,
-            chat_type=chat.type,
+            chat_type=chat_type,
         )
         if not created:
-            await update.effective_message.reply_text("当前聊天已经在推送目标列表里了。")
+            await update.effective_message.reply_text("这个目标已经在推送目标列表里了。")
             return
         await update.effective_message.reply_text(
-            f"已添加推送目标：{_chat_display_name(chat_title, chat.type, chat.id)}"
+            f"已添加推送目标：{_chat_display_name(chat_title, chat_type, target_chat_id)}"
         )
 
     async def target(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if await self.ensure_user(update) is None or not update.effective_message:
             return
         await update.effective_message.reply_text(
-            "出于安全考虑，已关闭手动 chat_id 添加。\n"
-            "请进入目标私聊、群组或频道后直接发送 /addtarget。"
+            "请改用：/addtarget 或 /addtarget <chat_id>\n"
+            "例如私聊绑定频道：/addtarget -1001234567890"
         )
 
     async def deltarget(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

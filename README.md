@@ -26,6 +26,7 @@
 - `/blocks`：查看屏蔽词
 - `/delblock <屏蔽词ID>`：删除屏蔽词
 - `/addtarget`：把当前聊天加入推送目标
+- `/addtarget <chat_id>`：在私聊里绑定群组或频道
 - `/targets`：查看推送目标
 - `/deltarget <目标ID>`：删除推送目标
 - `/history`：查看最近命中的帖子
@@ -36,7 +37,9 @@
 说明：
 
 - 默认私聊可直接使用，不需要手动 `/addtarget`
-- 群组或频道里只有管理员才能执行 `/addtarget`
+- 群组里可直接发送 `/addtarget`
+- 频道可在私聊里发送 `/addtarget <chat_id>` 进行绑定
+- 群组或频道都要求操作者是管理员
 - 如启用 `ALLOWED_USER_IDS`，只有白名单用户可以使用 Bot
 
 ## 可以先订阅我的机器人试试
@@ -46,55 +49,76 @@ https://t.me/NodeSeekKey_bot
 
 ## 个人部署教程
 
-1. VPS安装 Docker 和 Git：
+### 1. 准备 VPS 环境
+
+在 VPS 上安装 Docker 和 Git：
 
 ```bash
 apt update
 apt install -y docker.io docker-compose-plugin git
 ```
 
-2. 去 Telegram 找 `@BotFather` 创建 Bot，拿到 `BOT_TOKEN`
+### 2. 创建 Telegram Bot
 
-3. 在 VPS 上下载项目：
+在 Telegram 里找到 `@BotFather`，创建一个新的 Bot，并保存它给你的 `BOT_TOKEN`。
+
+### 3. 下载项目
+
+在 VPS 上执行：
 
 ```bash
 git clone https://github.com/<你的用户名>/nodeseek-rss-telegram-bot.git
 cd nodeseek-rss-telegram-bot
 ```
 
-4. 创建配置文件：
+### 4. 配置环境变量
+
+复制配置模板：
 
 ```bash
 cp .env.example .env
 nano .env
 ```
 
-  把 `BOT_TOKEN` 改成你自己的。
+把 `.env` 里的 `BOT_TOKEN` 改成你自己的 Token。
 
-  如需启用白名单模式，可以额外配置：
+如需启用白名单模式，可以额外配置：
 
 ```text
 ALLOWED_USER_IDS=<用户ID1>,<用户ID2>
 ```
 
-5. 启动 Bot：
+### 5. 启动 Bot
 
 ```bash
 docker compose up -d --build
 ```
 
-6. 查看是否成功：
+### 6. 查看运行日志
 
 ```bash
 docker compose logs -f
 ```
 
-  看到 `Application started` 就说明启动成功了。
+看到 `Application started` 就说明启动成功了。
 
-7. 更新项目：
+按 `Ctrl + C` 可以退出日志查看，不会停止 Bot。
+
+### 7. 更新项目
+
+如果只是普通更新，可以执行：
 
 ```bash
 git pull
+docker compose down
+docker compose up -d --build
+```
+
+如果 VPS 提示 Git 分支冲突，可以改用强制对齐 GitHub：
+
+```bash
+git fetch origin
+git reset --hard origin/main
 docker compose down
 docker compose up -d --build
 ```
